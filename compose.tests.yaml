@@ -1,0 +1,195 @@
+services:
+  mongo8:
+    image: mongo:8.0
+    container_name: datahelm-test-mongo8
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: datahelm-test-only
+    ports: ["127.0.0.1:28018:27017"]
+    command: ["mongod", "--bind_ip_all", "--wiredTigerCacheSizeGB", "0.25"]
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "mongosh",
+          "-u",
+          "admin",
+          "-p",
+          "datahelm-test-only",
+          "--authenticationDatabase",
+          "admin",
+          "--quiet",
+          "--eval",
+          "db.adminCommand({ping:1})",
+        ]
+      interval: 2s
+      timeout: 5s
+      retries: 40
+  mongo9:
+    image: mongo:9.0
+    container_name: datahelm-test-mongo9
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: datahelm-test-only
+    ports: ["127.0.0.1:28019:27017"]
+    command: ["mongod", "--bind_ip_all", "--wiredTigerCacheSizeGB", "0.25"]
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "mongosh",
+          "-u",
+          "admin",
+          "-p",
+          "datahelm-test-only",
+          "--authenticationDatabase",
+          "admin",
+          "--quiet",
+          "--eval",
+          "db.adminCommand({ping:1})",
+        ]
+      interval: 2s
+      timeout: 5s
+      retries: 40
+  app:
+    profiles: [integration]
+    image: datahelm:phase1
+    container_name: datahelm-tls-validation
+    ports: ["127.0.0.1:18080:8080"]
+    environment:
+      DATAHELM_ORIGIN: http://localhost:18080
+      DATAHELM_ADMIN_PASSWORD_FILE: /run/secrets/admin_password
+      DATAHELM_MASTER_KEY_FILE: /run/secrets/master_key
+    secrets:
+      - source: test_admin_password
+        target: admin_password
+      - source: test_master_key
+        target: master_key
+    volumes: ["app_fixture:/data"]
+    tmpfs: ["/run/datahelm:uid=10001,gid=10001,mode=0700"]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    depends_on:
+      mongo8: { condition: service_healthy }
+      mongo9: { condition: service_healthy }
+  rs1:
+    image: ${DATAHELM_FIXTURE_MONGO_IMAGE:-mongo:8.0}
+    command:
+      [
+        "mongod",
+        "--replSet",
+        "datahelm-rs",
+        "--bind_ip_all",
+        "--wiredTigerCacheSizeGB",
+        "0.25",
+      ]
+  rs2:
+    image: ${DATAHELM_FIXTURE_MONGO_IMAGE:-mongo:8.0}
+    command:
+      [
+        "mongod",
+        "--replSet",
+        "datahelm-rs",
+        "--bind_ip_all",
+        "--wiredTigerCacheSizeGB",
+        "0.25",
+      ]
+  rs3:
+    image: ${DATAHELM_FIXTURE_MONGO_IMAGE:-mongo:8.0}
+    command:
+      [
+        "mongod",
+        "--replSet",
+        "datahelm-rs",
+        "--bind_ip_all",
+        "--wiredTigerCacheSizeGB",
+        "0.25",
+      ]
+  config:
+    image: ${DATAHELM_FIXTURE_MONGO_IMAGE:-mongo:8.0}
+    command:
+      [
+        "mongod",
+        "--configsvr",
+        "--replSet",
+        "datahelm-config",
+        "--port",
+        "27017",
+        "--bind_ip_all",
+        "--wiredTigerCacheSizeGB",
+        "0.25",
+      ]
+  shard1:
+    image: ${DATAHELM_FIXTURE_MONGO_IMAGE:-mongo:8.0}
+    command:
+      [
+        "mongod",
+        "--shardsvr",
+        "--replSet",
+        "datahelm-shard1",
+        "--port",
+        "27017",
+        "--bind_ip_all",
+        "--wiredTigerCacheSizeGB",
+        "0.25",
+      ]
+  shard2:
+    image: ${DATAHELM_FIXTURE_MONGO_IMAGE:-mongo:8.0}
+    command:
+      [
+        "mongod",
+        "--shardsvr",
+        "--replSet",
+        "datahelm-shard2",
+        "--port",
+        "27017",
+        "--bind_ip_all",
+        "--wiredTigerCacheSizeGB",
+        "0.25",
+      ]
+  router:
+    image: ${DATAHELM_FIXTURE_MONGO_IMAGE:-mongo:8.0}
+    command:
+      [
+        "mongos",
+        "--configdb",
+        "datahelm-config/config:27017",
+        "--port",
+        "27017",
+        "--bind_ip_all",
+      ]
+    depends_on: [config, shard1, shard2]
+  ssh:
+    build: tests/ssh
+    ports: ["127.0.0.1:2223:22"]
+  certificates:
+    build: tests/ssh
+    command: ["sh", "-c", "cp /fixtures/tls/* /tls/ && chmod 644 /tls/*"]
+    volumes: ["tls_fixture:/tls"]
+  tls-mongo:
+    image: ${DATAHELM_FIXTURE_MONGO_IMAGE:-mongo:8.0}
+    command:
+      [
+        "mongod",
+        "--bind_ip_all",
+        "--tlsMode",
+        "requireTLS",
+        "--tlsCertificateKeyFile",
+        "/tls/server.pem",
+        "--tlsCAFile",
+        "/tls/ca.crt",
+        "--wiredTigerCacheSizeGB",
+        "0.25",
+      ]
+    volumes: ["tls_fixture:/tls:ro"]
+    depends_on:
+      certificates:
+        condition: service_completed_successfully
+volumes:
+  tls_fixture:
+  app_fixture:
+secrets:
+  test_admin_password:
+    file: ${DATAHELM_TEST_SECRET_DIR:-./data/integration-secrets}/admin_password
+  test_master_key:
+    file: ${DATAHELM_TEST_SECRET_DIR:-./data/integration-secrets}/master_key

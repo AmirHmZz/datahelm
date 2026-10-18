@@ -1,0 +1,22 @@
+services:
+  datahelm:
+    image: datahelm:phase1
+    build: .
+    environment:
+      DATAHELM_ORIGIN: ${DATAHELM_ORIGIN:-http://localhost:8080}
+      DATAHELM_ADMIN_USERNAME: ${DATAHELM_ADMIN_USERNAME:-admin}
+      DATAHELM_SECRETS_DIR: /var/lib/datahelm/secrets
+    volumes:
+      - datahelm_data:/data
+      - datahelm_secrets:/var/lib/datahelm/secrets
+    tmpfs:
+      - /run/datahelm:uid=10001,gid=10001,mode=0700
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+volumes:
+  datahelm_data:
+  datahelm_secrets:
+
