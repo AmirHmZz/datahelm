@@ -16,6 +16,14 @@ FROM backend AS test
 RUN --mount=type=cache,target=/usr/local/cargo/registry --mount=type=cache,target=/build/target cargo test --release --locked
 
 FROM debian:bookworm-slim
+ARG DATAHELM_VERSION=dev
+ARG DATAHELM_REVISION=unknown
+LABEL org.opencontainers.image.title="DataHelm" \
+      org.opencontainers.image.description="Self-hosted MongoDB administration dashboard" \
+      org.opencontainers.image.source="https://github.com/AmirHmZz/datahelm" \
+      org.opencontainers.image.licenses="MIT" \
+      org.opencontainers.image.version=$DATAHELM_VERSION \
+      org.opencontainers.image.revision=$DATAHELM_REVISION
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl && rm -rf /var/lib/apt/lists/* && useradd -u 10001 -m datahelm && mkdir -p /data /var/lib/datahelm/secrets && chown datahelm /data /var/lib/datahelm/secrets && chmod 700 /var/lib/datahelm/secrets
 WORKDIR /app
 COPY --from=backend /build/datahelm /usr/local/bin/datahelm

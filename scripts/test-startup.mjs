@@ -65,7 +65,7 @@ try {
   await mkdir(join(root, "data"), { recursive: true });
   await writeFile(
     override,
-    `services:\n  datahelm:\n    ports: ["127.0.0.1:18081:8080"]\n    environment:\n      DATAHELM_ORIGIN: ${base}\n      DATAHELM_ADMIN_USERNAME: admin\n`,
+    `services:\n  datahelm:\n    image: ${process.env.DATAHELM_STARTUP_IMAGE || "datahelm:phase1"}\n    ports: ["127.0.0.1:18081:8080"]\n    environment:\n      DATAHELM_ORIGIN: ${base}\n      DATAHELM_ADMIN_USERNAME: admin\n`,
     { flag: "wx" },
   );
   const original = JSON.parse(

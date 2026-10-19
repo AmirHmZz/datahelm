@@ -9,16 +9,31 @@ A self-hosted MongoDB 8+ administration dashboard. Rust/Axum serves a React, sha
 
 ## Start with Docker
 
-Requires Docker Compose. Setup runs automatically inside the application at runtime; no Bun/Node.js or setup script is needed on the host.
+Requires Docker Compose and an AMD64 Linux Docker host. The default setup pulls the public image from `ghcr.io/amirhmzz/datahelm:latest`; no registry login is required. Setup runs automatically inside the application at runtime; no Bun/Node.js or setup script is needed on the host.
 
 ```powershell
+Copy-Item .env.example .env
+# Edit DATAHELM_ORIGIN in .env to match your reverse proxy's browser URL.
 docker compose up -d
 docker compose logs datahelm
 ```
 
 The first startup generates a random encryption key and temporary administrator password. The username (default `admin`) and temporary password appear once in the container logs when the account is created. Sign in with these credentials and set a new password before accessing the dashboard. Later password changes are available from the key icon beside the administrator account in the sidebar. Password changes require the current password and sign out other sessions. New passwords and encryption keys are never logged.
 
-Compose publishes **no host ports**. Connect your reverse proxy to the application's Docker network and route it to `http://datahelm:8080`. Set `DATAHELM_ORIGIN` in `.env` to the exact browser URL, such as `https://datahelm.example.com`; HTTPS origins enable Secure session cookies. For local browser access, explicitly provide your own Compose override with a localhost port mapping. Use `docker compose up --build -d` after source changes to rebuild an existing image.
+Compose publishes **no host ports**. Connect your reverse proxy to the application's Docker network and route it to `http://datahelm:8080`. Set `DATAHELM_ORIGIN` in `.env` to the exact browser URL, such as `https://datahelm.example.com`; HTTPS origins enable Secure session cookies. For local browser access, explicitly provide your own Compose override with a localhost port mapping.
+
+Set `DATAHELM_IMAGE` in `.env` to select a specific release (for example `ghcr.io/amirhmzz/datahelm:0.1.0`), the development `:edge` tag, a `:sha-<full-commit-sha>` tag, or an immutable `@sha256:...` digest. `latest` follows stable releases; `edge` follows passing builds on `main`. Update the selected image without deleting volumes:
+
+```powershell
+docker compose pull
+docker compose up -d
+```
+
+To build from your local source instead, use the explicit development override:
+
+```powershell
+docker compose -f compose.yaml -f compose.build.yaml up --build -d
+```
 
 SQLite lives in `datahelm_data`; the generated key lives in the separate `datahelm_secrets` volume at `/var/lib/datahelm/secrets/master_key` (directory mode 0700, key mode 0600). Only the password hash is persisted. Recreating containers reuses the key and account; it does not generate new credentials or print them again. Preserve both volumes.
 
@@ -30,6 +45,7 @@ For an existing deployment created using the former `setup.mjs`, import the **or
 
 | Variable                       | Default / purpose                                           |
 | ------------------------------ | ----------------------------------------------------------- |
+| `DATAHELM_IMAGE`               | Compose only: `ghcr.io/amirhmzz/datahelm:latest`             |
 | `DATAHELM_BIND`                | `127.0.0.1:8080` outside Docker                             |
 | `DATAHELM_ORIGIN`              | `http://localhost:8080`; exact browser origin               |
 | `DATAHELM_DATABASE_URL`        | `sqlite://datahelm.db`; Docker uses `/data/datahelm.db`     |
@@ -107,8 +123,34 @@ The fixture services deliberately use test credentials and are separate from dep
 
 Remove manually started fixtures afterward with `docker compose -p datahelm-fixtures -f compose.tests.yaml --profile integration down -v`. Never reuse these test credentials for deployment.
 
+## CI and Docker releases
+
+GitHub Actions validates pull requests, pushes to `main`, and `v*` tags. It scans the full checked-out Git history for credentials, runs Rust tests and frontend component tests/builds, checks generated API contracts, and validates the runtime image against MongoDB 8/9, browser workflows, and startup/recreation persistence. Release tags must be stable `vX.Y.Z`, match both package versions, and point to a commit on `main`.
+
+Only successful push runs publish images. Pull requests have read-only repository permissions and never receive publishing credentials. A separate publishing job downloads the tested image artifact and pushes it to GHCR with the built-in `GITHUB_TOKEN`; it does not rebuild the image or require a personal access token. The image artifact expires after one day. Workflow actions are pinned to commit SHAs.
+
+| Trigger | Published image tags |
+| ------- | -------------------- |
+| Push to `main` | `edge`, `sha-<full-commit-sha>` |
+| Stable tag such as `v0.1.0` | `0.1.0`, `0.1`, `latest` |
+
+To release, update the version in `backend/Cargo.toml` and `frontend/package.json`, regenerate API contracts if necessary, and merge to `main`. After its CI passes, tag that commit and push the tag:
+
+```powershell
+git switch main
+git pull --ff-only
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+The repository uses manual version tags. There is no automatic release PR or server deployment. GHCR package visibility is configured separately from repository visibility: after the first publication, set the `datahelm` container package to Public in GitHub package settings and verify an anonymous pull. Published images declare their source repository, commit, version, and MIT license in OCI labels. Production installation requires no Bun or Rust toolchain.
+
 ## Backup and restore
 
 Stop DataHelm, back up the SQLite volume and secrets volume separately, then restart. Preserve the entire SQLite database; if copying while the app is stopped, include any remaining `-wal`/`-shm` files. The administrator password is represented only by its hash in SQLite. If you use an externally supplied master key instead of the generated volume key, back up that file separately.
 
 Restore the database volume and the **matching** master key to a new deployment before starting. Losing the key makes connection credentials unrecoverable. Moving only the database is insufficient. Key rotation requires a deliberate decrypt/re-encrypt maintenance procedure; replacing the key file alone is not rotation.
+
+## License
+
+DataHelm is licensed under the [MIT License](LICENSE).
