@@ -1,7 +1,6 @@
 services:
   datahelm:
-    image: datahelm:phase1
-    build: .
+    image: ${DATAHELM_IMAGE:-ghcr.io/amirhmzz/datahelm:latest}
     environment:
       DATAHELM_ORIGIN: ${DATAHELM_ORIGIN:-http://localhost:8080}
       DATAHELM_ADMIN_USERNAME: ${DATAHELM_ADMIN_USERNAME:-admin}

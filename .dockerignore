@@ -6,7 +6,7 @@ frontend/test-results
 frontend/playwright-report
 data
 secrets
-.env
+.env*
 *.db*
 *.tsbuildinfo
 

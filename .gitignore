@@ -5,7 +5,8 @@
 /frontend/playwright-report/
 /data/
 /secrets/
-.env
+.env*
+!.env.example
 *.db
 *.db-shm
 *.db-wal
