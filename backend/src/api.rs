@@ -77,7 +77,7 @@ use utoipa::OpenApi;
         ClickHouseConfig,
         crate::clickhouse_model::ClickHouseMetric
     )),
-    info(title = "DataHelm API", version = "0.2.1")
+    info(title = "DataHelm API", version = "0.3.0")
 )]
 struct ApiDoc;
 pub fn openapi() -> utoipa::openapi::OpenApi {
