@@ -135,7 +135,9 @@ if (
   event.size !== memberStats.reduce((sum, s) => sum + s.size, 0) ||
   event.storage_size !== memberStats.reduce((sum, s) => sum + s.storage, 0)
 )
-  throw new Error("Sharded statistics mismatch");
+  throw new Error(
+    `Sharded statistics mismatch: catalog=${JSON.stringify(event)}; members=${JSON.stringify(memberStats)}`,
+  );
 console.log("Sharded collection statistics passed");
 // An intentionally slow, tagged query on the disposable standalone fixture.
 const standalone = (

@@ -37,6 +37,7 @@ async fn state() -> AppState {
     AppState {
         store,
         provider: Arc::new(MongoProvider::new("unused".into())),
+        clickhouse: Default::default(),
         login_attempts: Default::default(),
         secure_cookie: true,
         origin: "https://helm.example".into(),
@@ -88,6 +89,26 @@ async fn forced_password_change_enforces_api_csrf_and_revokes_sessions() {
         .unwrap();
     assert!(session.must_change_password);
     let app = api::router(state.clone());
+    for path in [
+        "/connections/example/clickhouse/users",
+        "/connections/example/clickhouse/grants",
+        "/connections/example/clickhouse/queries",
+    ] {
+        assert_eq!(
+            request(
+                &app,
+                path,
+                "GET",
+                &cookie,
+                "",
+                "https://helm.example",
+                json!(null)
+            )
+            .await
+            .0,
+            403
+        );
+    }
     assert_eq!(
         request(
             &app,

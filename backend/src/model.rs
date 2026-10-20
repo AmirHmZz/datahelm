@@ -1,6 +1,49 @@
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
+#[derive(Clone, Copy, Serialize, Deserialize, ToSchema, Default, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum DatabaseEngine {
+    #[default]
+    Mongodb,
+    Clickhouse,
+}
+
+#[derive(Clone, Serialize, Deserialize, ToSchema)]
+pub struct ClickHouseConfig {
+    pub endpoint: String,
+    #[serde(default = "clickhouse_database")]
+    pub database: String,
+    #[serde(default = "clickhouse_user")]
+    pub username: String,
+    pub password: Option<String>,
+}
+fn clickhouse_database() -> String {
+    "default".into()
+}
+fn clickhouse_user() -> String {
+    "default".into()
+}
+impl ClickHouseConfig {
+    pub fn validate(&self) -> Result<(), String> {
+        let url = reqwest::Url::parse(&self.endpoint)
+            .map_err(|_| "Invalid ClickHouse HTTP(S) endpoint")?;
+        if !matches!(url.scheme(), "http" | "https")
+            || url.host_str().is_none()
+            || !url.username().is_empty()
+            || url.password().is_some()
+            || url.query().is_some()
+            || url.fragment().is_some()
+        {
+            return Err("Use an http:// or https:// endpoint without credentials, query parameters, or fragments".into());
+        }
+        if self.database.is_empty() || self.username.is_empty() {
+            return Err("ClickHouse database and username are required".into());
+        }
+        Ok(())
+    }
+}
+
 #[derive(Clone, Serialize, Deserialize, ToSchema, Default)]
 pub struct TlsConfig {
     #[serde(default)]
@@ -37,6 +80,10 @@ fn enabled() -> bool {
 }
 #[derive(Clone, Serialize, Deserialize, ToSchema)]
 pub struct ConnectionConfig {
+    #[serde(default)]
+    pub engine: DatabaseEngine,
+    #[serde(default)]
+    pub clickhouse: Option<ClickHouseConfig>,
     pub name: String,
     #[serde(default = "mode")]
     pub mode: String,
@@ -75,6 +122,12 @@ impl ConnectionConfig {
             c.hosts = "[invalid host form]".into();
         }
         c.password = None;
+        if let Some(ch) = &mut c.clickhouse {
+            ch.password = None;
+            if ch.validate().is_err() {
+                ch.endpoint = "[invalid endpoint]".into();
+            }
+        }
         c.tls.ca_pem = None;
         c.tls.client_pem = None;
         c.tls.key_password = None;
@@ -85,6 +138,13 @@ impl ConnectionConfig {
     }
     // None means preserve; an explicit empty string means clear.
     pub fn preserve(&mut self, old: &Self) {
+        if self.engine == old.engine {
+            if let (Some(ch), Some(previous)) = (&mut self.clickhouse, &old.clickhouse) {
+                if ch.password.is_none() {
+                    ch.password = previous.password.clone();
+                }
+            }
+        }
         macro_rules! keep {
             ($a:expr, $b:expr) => {
                 if $a.is_none() {
@@ -105,27 +165,56 @@ impl ConnectionConfig {
         if self.name.trim().is_empty() || self.name.len() > 120 {
             return Err("A connection name of 1–120 characters is required".into());
         }
-        if self.mode != "uri" && self.mode != "form" {
-            return Err("Connection mode must be uri or form".into());
-        }
-        if self.mode == "uri"
-            && !self
-                .uri
-                .as_deref()
-                .is_some_and(|u| u.starts_with("mongodb://") || u.starts_with("mongodb+srv://"))
-        {
-            return Err("Enter a mongodb:// or mongodb+srv:// URI".into());
-        }
-        if self.mode == "form" && self.hosts.trim().is_empty() {
-            return Err("At least one host is required".into());
-        }
-        if self.mode == "form"
-            && self
-                .hosts
-                .chars()
-                .any(|c| matches!(c, '@' | '/' | '?' | '#'))
-        {
-            return Err("Enter host:port seeds only; use URI mode or the authentication fields for credentials and options".into());
+        if self.engine == DatabaseEngine::Clickhouse {
+            self.clickhouse
+                .as_ref()
+                .ok_or("ClickHouse configuration is required")?
+                .validate()?;
+            if self.tls.enabled
+                && !self
+                    .clickhouse
+                    .as_ref()
+                    .unwrap()
+                    .endpoint
+                    .starts_with("https://")
+            {
+                return Err("Use an https:// endpoint when TLS is enabled".into());
+            }
+            if self.tls.client_pem.as_ref().is_some_and(|s| !s.is_empty())
+                || self
+                    .tls
+                    .key_password
+                    .as_ref()
+                    .is_some_and(|s| !s.is_empty())
+            {
+                return Err("ClickHouse client certificate authentication is outside this release; use password authentication".into());
+            }
+        } else {
+            if self.clickhouse.is_some() {
+                return Err("ClickHouse settings require the ClickHouse engine".into());
+            }
+            if self.mode != "uri" && self.mode != "form" {
+                return Err("Connection mode must be uri or form".into());
+            }
+            if self.mode == "uri"
+                && !self
+                    .uri
+                    .as_deref()
+                    .is_some_and(|u| u.starts_with("mongodb://") || u.starts_with("mongodb+srv://"))
+            {
+                return Err("Enter a mongodb:// or mongodb+srv:// URI".into());
+            }
+            if self.mode == "form" && self.hosts.trim().is_empty() {
+                return Err("At least one host is required".into());
+            }
+            if self.mode == "form"
+                && self
+                    .hosts
+                    .chars()
+                    .any(|c| matches!(c, '@' | '/' | '?' | '#'))
+            {
+                return Err("Enter host:port seeds only; use URI mode or the authentication fields for credentials and options".into());
+            }
         }
         if self.ssh.enabled
             && (self.ssh.host.trim().is_empty()
@@ -153,6 +242,44 @@ mod tests {
                 .unwrap()
                 .contains("private-password")
         );
+    }
+    #[test]
+    fn legacy_and_clickhouse_secrets() {
+        let old: ConnectionConfig =
+            serde_json::from_value(serde_json::json!({"name":"legacy"})).unwrap();
+        assert!(old.engine == DatabaseEngine::Mongodb);
+        assert!(old.validate().is_ok());
+        let old:ConnectionConfig=serde_json::from_value(serde_json::json!({"name":"ch","engine":"clickhouse","clickhouse":{"endpoint":"https://localhost:8443","password":"sensitive"}})).unwrap();
+        assert!(old.validate().is_ok());
+        let mut public = old.public();
+        assert!(
+            !serde_json::to_string(&public)
+                .unwrap()
+                .contains("sensitive")
+        );
+        public.preserve(&old);
+        assert_eq!(
+            public.clickhouse.as_ref().unwrap().password.as_deref(),
+            Some("sensitive")
+        );
+        public.clickhouse.as_mut().unwrap().password = Some("".into());
+        public.preserve(&old);
+        assert_eq!(public.clickhouse.unwrap().password.as_deref(), Some(""));
+        for endpoint in [
+            "http://u:secret@localhost:8123",
+            "http://localhost:8123/?password=secret",
+            "file:///tmp/key",
+            "http://localhost:8123/#secret",
+        ] {
+            let mut c = old.clone();
+            c.clickhouse.as_mut().unwrap().endpoint = endpoint.into();
+            assert!(c.validate().is_err());
+            assert!(
+                !serde_json::to_string(&c.public())
+                    .unwrap()
+                    .contains("secret")
+            );
+        }
     }
 }
 #[derive(Serialize, ToSchema)]
@@ -189,6 +316,8 @@ pub struct PasswordChange {
 }
 #[derive(Clone, Serialize, Deserialize, ToSchema)]
 pub struct Metric {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub clickhouse: Option<crate::clickhouse_model::ClickHouseMetric>,
     pub timestamp: i64,
     pub source: String,
     pub connections: Option<f64>,

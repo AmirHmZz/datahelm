@@ -1,0 +1,43 @@
+services:
+  certificates:
+    build: tests/ssh
+    command: ["sh", "-c", "cp /fixtures/tls/* /tls/ && chmod 644 /tls/*"]
+    volumes: ["tls:/tls"]
+  ssh:
+    build: tests/ssh
+  clickhouse:
+    image: clickhouse/clickhouse-server:26.8
+    environment:
+      CLICKHOUSE_USER: admin
+      CLICKHOUSE_PASSWORD: datahelm-test-only
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
+    ports: ["127.0.0.1:28123:8123"]
+    volumes:
+      - ch-data:/var/lib/clickhouse
+      - tls:/tls:ro
+      - ./tests/clickhouse/config.xml:/etc/clickhouse-server/config.d/datahelm.xml:ro
+      - ./tests/clickhouse/users.xml:/etc/clickhouse-server/users.d/datahelm.xml:ro
+    depends_on:
+      certificates: { condition: service_completed_successfully }
+    healthcheck:
+      test: ["CMD", "clickhouse-client", "--user", "admin", "--password", "datahelm-test-only", "--query", "SELECT 1"]
+      interval: 2s
+      timeout: 5s
+      retries: 60
+  app:
+    image: ${DATAHELM_CLICKHOUSE_TEST_IMAGE:-datahelm:phase1}
+    ports: ["127.0.0.1:18082:8080"]
+    environment:
+      DATAHELM_ORIGIN: http://localhost:18082
+      DATAHELM_ADMIN_PASSWORD: clickhouse-fixture-admin-password
+    volumes: ["app-data:/data", "app-secrets:/var/lib/datahelm/secrets"]
+    tmpfs: ["/run/datahelm:uid=10001,gid=10001,mode=0700"]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    depends_on:
+      clickhouse: { condition: service_healthy }
+volumes:
+  tls:
+  ch-data:
+  app-data:
+  app-secrets:

@@ -164,6 +164,230 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/connections/{id}/clickhouse/columns": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["columns"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/connections/{id}/clickhouse/databases": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["databases"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/connections/{id}/clickhouse/default-roles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["default_roles"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/connections/{id}/clickhouse/grants": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["grants"];
+        put?: never;
+        post: operations["grant"];
+        delete: operations["revoke"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/connections/{id}/clickhouse/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["history"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/connections/{id}/clickhouse/networks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["networks"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/connections/{id}/clickhouse/privileges": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["privileges"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/connections/{id}/clickhouse/queries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["queries"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/connections/{id}/clickhouse/queries/kill": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["clickhouse_kill"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/connections/{id}/clickhouse/replicas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["replicas"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/connections/{id}/clickhouse/role-grants": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["role_grants"];
+        put?: never;
+        post: operations["assign_role"];
+        delete: operations["revoke_role"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/connections/{id}/clickhouse/roles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["clickhouse_roles"];
+        put?: never;
+        post: operations["clickhouse_create_role"];
+        delete: operations["clickhouse_delete_role"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/connections/{id}/clickhouse/tables": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["tables"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/connections/{id}/clickhouse/users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["clickhouse_users"];
+        put?: never;
+        post: operations["clickhouse_create_user"];
+        delete: operations["clickhouse_delete_user"];
+        options?: never;
+        head?: never;
+        patch: operations["clickhouse_update_user"];
+        trace?: never;
+    };
     "/api/v1/connections/{id}/collection-names": {
         parameters: {
             query?: never;
@@ -408,9 +632,43 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        Capabilities: {
+            engine: string;
+            features: {
+                [key: string]: components["schemas"]["Feature"];
+            };
+            server_version: string;
+            source: string;
+        };
+        ClickHouseConfig: {
+            database?: string;
+            endpoint: string;
+            password?: string | null;
+            username?: string;
+        };
+        ClickHouseMetric: {
+            /** Format: double */
+            active_queries?: number | null;
+            /** Format: double */
+            queries_per_second?: number | null;
+            /** Format: double */
+            read_bytes_per_second?: number | null;
+            /** Format: double */
+            written_bytes_per_second?: number | null;
+        };
+        ColumnRow: {
+            database: string;
+            default_expression: string;
+            default_kind: string;
+            name: string;
+            table: string;
+            type: string;
+        };
         ConnectionConfig: {
             auth_database?: string;
+            clickhouse?: null | components["schemas"]["ClickHouseConfig"];
             direct?: boolean;
+            engine?: components["schemas"]["DatabaseEngine"];
             hosts?: string;
             mechanism?: string;
             mode?: string;
@@ -441,6 +699,53 @@ export interface components {
             latency_ms?: number | null;
             status: string;
         };
+        /** @enum {string} */
+        DatabaseEngine: "mongodb" | "clickhouse";
+        DatabaseRow: {
+            engine: string;
+            name: string;
+        };
+        /** @enum {string} */
+        DefaultRoleMode: "all" | "none" | "list";
+        DefaultRoles: {
+            mode: components["schemas"]["DefaultRoleMode"];
+            roles: string[];
+            user: string;
+        };
+        Feature: {
+            available: boolean;
+            reason?: string | null;
+        };
+        GrantChange: {
+            column?: string | null;
+            database: string;
+            grant_option?: boolean;
+            privilege: string;
+            table: string;
+            target: components["schemas"]["Target"];
+        };
+        GrantRow: {
+            access_type: string;
+            column?: string | null;
+            database?: string | null;
+            /** Format: int32 */
+            grant_option: number;
+            /** Format: int32 */
+            is_partial_revoke: number;
+            role_name?: string | null;
+            table?: string | null;
+            user_name?: string | null;
+        };
+        HistoryRow: {
+            event_time: string;
+            /** Format: int32 */
+            exception_code: number;
+            query: string;
+            query_duration_ms: string;
+            query_id: string;
+            read_rows: string;
+            user: string;
+        };
         Identity: {
             db: string;
             name: string;
@@ -453,6 +758,7 @@ export interface components {
             username: string;
         };
         Metric: {
+            clickhouse?: null | components["schemas"]["ClickHouseMetric"];
             /** Format: double */
             connections?: number | null;
             error?: string | null;
@@ -470,15 +776,65 @@ export interface components {
             /** Format: double */
             virtual_memory_bytes?: number | null;
         };
+        MutationResult: {
+            ok: boolean;
+        };
+        /** @enum {string} */
+        NetworkMode: "any" | "local" | "ip";
+        Networks: {
+            addresses: string[];
+            mode: components["schemas"]["NetworkMode"];
+            user: string;
+        };
         PasswordChange: {
             current_password: string;
             new_password: string;
+        };
+        PrivilegeRow: {
+            level: string;
+            privilege: string;
         };
         ProfilerMutation: {
             db: string;
             enabled: boolean;
             /** Format: int64 */
             slow_ms?: number | null;
+        };
+        QueryRow: {
+            /** Format: double */
+            elapsed: number;
+            kill_token?: string | null;
+            memory_usage: string;
+            query: string;
+            query_id: string;
+            read_rows: string;
+            user: string;
+        };
+        ReplicaRow: {
+            absolute_delay: string;
+            database: string;
+            /** Format: int32 */
+            is_readonly: number;
+            queue_size: string;
+            replica_name: string;
+            table: string;
+        };
+        RoleChange: {
+            name: string;
+        };
+        RoleGrantChange: {
+            admin_option?: boolean;
+            role: string;
+            target: components["schemas"]["Target"];
+        };
+        RoleGrantRow: {
+            /** Format: int32 */
+            granted_role_is_default: number;
+            granted_role_name: string;
+            role_name?: string | null;
+            user_name?: string | null;
+            /** Format: int32 */
+            with_admin_option: number;
         };
         RoleMutation: {
             db: string;
@@ -489,6 +845,12 @@ export interface components {
         RoleRef: {
             db: string;
             role: string;
+        };
+        RoleRow: {
+            id: string;
+            name: string;
+            readonly?: boolean;
+            storage: string;
         };
         SessionView: {
             csrf_token: string;
@@ -506,6 +868,21 @@ export interface components {
             private_key?: string | null;
             username?: string;
         };
+        TableRow: {
+            database: string;
+            engine: string;
+            name: string;
+            partition_key: string;
+            sorting_key: string;
+            total_bytes?: string | null;
+            total_rows?: string | null;
+        };
+        Target: {
+            kind: components["schemas"]["TargetKind"];
+            name: string;
+        };
+        /** @enum {string} */
+        TargetKind: "user" | "role";
         TestRequest: {
             config: components["schemas"]["ConnectionConfig"];
             saved_id?: string | null;
@@ -517,12 +894,31 @@ export interface components {
             enabled?: boolean;
             key_password?: string | null;
         };
+        UserChange: {
+            name: string;
+            password?: string | null;
+        };
         UserMutation: {
             db: string;
             mechanisms?: string[] | null;
             password?: string | null;
             roles: components["schemas"]["RoleRef"][];
             user: string;
+        };
+        UserRow: {
+            auth_type: string[];
+            /** Format: int32 */
+            default_roles_all: number;
+            default_roles_except: string[];
+            default_roles_list: string[];
+            host_ip: string[];
+            host_names: string[];
+            host_names_like: string[];
+            host_names_regexp: string[];
+            id: string;
+            name: string;
+            readonly?: boolean;
+            storage: string;
         };
     };
     responses: never;
@@ -785,6 +1181,542 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+        };
+    };
+    columns: {
+        parameters: {
+            query: {
+                database: string;
+                table: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ColumnRow"][];
+                };
+            };
+        };
+    };
+    databases: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DatabaseRow"][];
+                };
+            };
+        };
+    };
+    default_roles: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DefaultRoles"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationResult"];
+                };
+            };
+        };
+    };
+    grants: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GrantRow"][];
+                };
+            };
+        };
+    };
+    grant: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GrantChange"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationResult"];
+                };
+            };
+        };
+    };
+    revoke: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GrantChange"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationResult"];
+                };
+            };
+        };
+    };
+    history: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HistoryRow"][];
+                };
+            };
+        };
+    };
+    networks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Networks"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationResult"];
+                };
+            };
+        };
+    };
+    privileges: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PrivilegeRow"][];
+                };
+            };
+        };
+    };
+    queries: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueryRow"][];
+                };
+            };
+        };
+    };
+    clickhouse_kill: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KillRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationResult"];
+                };
+            };
+        };
+    };
+    replicas: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReplicaRow"][];
+                };
+            };
+        };
+    };
+    role_grants: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoleGrantRow"][];
+                };
+            };
+        };
+    };
+    assign_role: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RoleGrantChange"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationResult"];
+                };
+            };
+        };
+    };
+    revoke_role: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RoleGrantChange"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationResult"];
+                };
+            };
+        };
+    };
+    clickhouse_roles: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoleRow"][];
+                };
+            };
+        };
+    };
+    clickhouse_create_role: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RoleChange"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationResult"];
+                };
+            };
+        };
+    };
+    clickhouse_delete_role: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RoleChange"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationResult"];
+                };
+            };
+        };
+    };
+    tables: {
+        parameters: {
+            query: {
+                database: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TableRow"][];
+                };
+            };
+        };
+    };
+    clickhouse_users: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserRow"][];
+                };
+            };
+        };
+    };
+    clickhouse_create_user: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UserChange"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationResult"];
+                };
+            };
+        };
+    };
+    clickhouse_delete_user: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RoleChange"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationResult"];
+                };
+            };
+        };
+    };
+    clickhouse_update_user: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UserChange"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationResult"];
                 };
             };
         };

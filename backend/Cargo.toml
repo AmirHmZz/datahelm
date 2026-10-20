@@ -1,6 +1,6 @@
 [package]
 name = "datahelm"
-version = "0.1.0"
+version = "0.2.1"
 edition = "2024"
 license = "MIT"
 repository = "https://github.com/AmirHmZz/datahelm"
@@ -26,6 +26,7 @@ utoipa = { version = "5", features = ["axum_extras"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 zeroize = { version = "1", features = ["derive"] }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "socks", "json", "stream"] }
 
 [dev-dependencies]
 tower = { version = "0.5", features = ["util"] }

@@ -95,7 +95,11 @@ impl Store {
                 last_success: row.get("last_success"),
                 latency_ms: row.get("latency_ms"),
                 error: row.get("error"),
-                has_password: c.password.as_ref().is_some_and(|x| !x.is_empty()),
+                has_password: c.password.as_ref().is_some_and(|x| !x.is_empty())
+                    || c.clickhouse
+                        .as_ref()
+                        .and_then(|ch| ch.password.as_ref())
+                        .is_some_and(|x| !x.is_empty()),
                 has_uri: c.uri.is_some(),
                 has_ca: c.tls.ca_pem.as_ref().is_some_and(|s| !s.is_empty()),
                 has_client_certificate: c.tls.client_pem.as_ref().is_some_and(|s| !s.is_empty()),

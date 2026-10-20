@@ -19,7 +19,7 @@ FROM debian:bookworm-slim
 ARG DATAHELM_VERSION=dev
 ARG DATAHELM_REVISION=unknown
 LABEL org.opencontainers.image.title="DataHelm" \
-      org.opencontainers.image.description="Self-hosted MongoDB administration dashboard" \
+      org.opencontainers.image.description="Self-hosted MongoDB and ClickHouse administration dashboard" \
       org.opencontainers.image.source="https://github.com/AmirHmZz/datahelm" \
       org.opencontainers.image.licenses="MIT" \
       org.opencontainers.image.version=$DATAHELM_VERSION \

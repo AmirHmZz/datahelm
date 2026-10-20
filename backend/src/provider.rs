@@ -136,6 +136,9 @@ impl MongoProvider {
     }
     async fn connect_inner(&self, c: &ConnectionConfig) -> Result<Arc<Entry>, String> {
         c.validate()?;
+        if c.engine != DatabaseEngine::Mongodb {
+            return Err("This endpoint requires a MongoDB connection".into());
+        }
         let mut options = if c.mode == "uri" {
             ClientOptions::parse(c.uri.as_deref().unwrap_or(""))
                 .await
@@ -705,6 +708,7 @@ impl MongoProvider {
             .cloned()
             .unwrap_or_default();
         let mut metric = Metric {
+            clickhouse: None,
             timestamp: now,
             source,
             connections: status
@@ -868,10 +872,17 @@ pub fn start_monitor(state: AppState) {
                     let old = previous.get(&c.id).cloned();
                     async move {
                         let start = std::time::Instant::now();
-                        let result = state
-                            .provider
-                            .sample(&state.store, &c.id, old.as_ref(), now)
-                            .await;
+                        let result = if c.config.engine == DatabaseEngine::Clickhouse {
+                            state
+                                .clickhouse
+                                .sample(&state.store, &c.id, old.as_ref(), now)
+                                .await
+                        } else {
+                            state
+                                .provider
+                                .sample(&state.store, &c.id, old.as_ref(), now)
+                                .await
+                        };
                         let m = match result {
                             Ok(m) => {
                                 state
@@ -882,11 +893,13 @@ pub fn start_monitor(state: AppState) {
                             }
                             Err(err) => {
                                 state.provider.invalidate(&c.id).await;
+                                state.clickhouse.invalidate(&c.id).await;
                                 state
                                     .store
                                     .status(&c.id, Some(&err), start.elapsed().as_millis() as i64)
                                     .await;
                                 Metric {
+                                    clickhouse: None,
                                     timestamp: now,
                                     source: old
                                         .as_ref()
@@ -938,6 +951,7 @@ mod tests {
     }
     fn metric(t: i64, n: f64) -> Metric {
         Metric {
+            clickhouse: None,
             timestamp: t,
             source: "node:27017".into(),
             connections: Some(2.),

@@ -5,7 +5,7 @@
   <img src="frontend/public/graphics/logos/datahelm-light.svg" alt="DataHelm." width="300" />
 </picture>
 
-A self-hosted MongoDB 8+ administration dashboard. Rust/Axum serves a React, shadcn/ui, and Tailwind frontend. Supports encrypted saved connections, TLS, SSH tunnels, database metadata, users and custom roles, operations, profiling, topology, and seven days of metrics. Atlas administration, document editing, and ClickHouse are outside Phase 1.
+A self-hosted MongoDB 8+ and ClickHouse 26.8+ administration dashboard. Rust/Axum serves a React, shadcn/ui, and Tailwind frontend. Supports encrypted saved connections, TLS, SSH tunnels, database metadata, users and roles, active operations, topology, and seven days of metrics. MongoDB also supports node-specific profiling. Atlas and ClickHouse Cloud administration, document/data editing, arbitrary SQL, and database/table mutations are outside this release.
 
 ## Start with Docker
 
@@ -68,6 +68,30 @@ The secret variables also accept values without `_FILE` for environments with a 
 - Current operations are scoped to the connected node, including local router operations on `mongos`. Cancellation is manual, requires confirmation, and rechecks a short-lived encrypted operation reference on its original node. Internal and DataHelm operations are excluded from cancellation.
 - Profiling is node-specific. To change a replica-set member's profiler, save a single-host connection with direct mode enabled. `mongos` cannot store profiler records; use its recent diagnostic slow log or a direct `mongod` connection. One-click enable uses level 1 and preserves sampling/filter settings. Changing `slowms` also affects that node's diagnostic slow logging. Query contents remain in MongoDB; DataHelm does not persist profile/log payloads.
 - Database/collection metadata and built-in roles are read-only. Administrative changes are recorded in `/api/v1/audit` without passwords or query bodies.
+
+## ClickHouse access and behavior
+
+Choose **ClickHouse** when adding a connection. Use an HTTP(S) endpoint such as `http://clickhouse:8123` or `https://clickhouse.example.com:8443`, a database (normally `default`), and a database username/password. Native TCP ports 9000/9440 are not HTTP endpoints. The backend must reach the endpoint; `localhost` inside Docker means the Datahelm container. Credentials belong in the dedicated fields, never in the endpoint URL. HTTPS verifies the original hostname, including over SSH; upload your CA for private certificates. SSH supports the same host fingerprint verification, passwords, keys, and passphrases as MongoDB. Client-certificate and external database authentication configuration are outside this release.
+
+Existing connections without an engine field remain MongoDB connections. A saved connection's engine cannot change; create a new connection to use another engine. ClickHouse secrets share the existing encrypted vault and master key. Blank connection-password edits preserve the saved secret; use the explicit remove action to clear it. Changing a database user's password does not change saved connection credentials automatically.
+
+Administration uses ClickHouse SQL access control against the **connected server**, with no `ON CLUSTER`. Replicated access storage may propagate changes according to the server's configuration. Use a dedicated SQL-managed account and grant only the privileges needed. Initial SQL administration must be enabled by the ClickHouse operator (for example, `access_management` for a configuration-backed bootstrap account); Datahelm never edits server configuration or elevates privileges. Monitoring reads `system.metrics` and `system.events`; catalog reads database/table/column metadata; replication reads `system.replicas`; active queries use `system.processes`; history reads `system.query_log`. User/role pages require the corresponding `SHOW ACCESS` privileges. Changes require `CREATE/ALTER/DROP USER`, `CREATE/DROP ROLE`, the privileges being granted with grant option, and the applicable role admin permissions. Cancellation requires ClickHouse's query-cancellation authorization. Capability checks are read-only; ClickHouse enforces final resource-level access.
+
+The access editor supports SQL-managed users, bcrypt password resets, roles and role inheritance, default roles, direct privilege grants/revokes (including columns), grant/admin options, and explicit ANY/LOCAL/IP/CIDR network restrictions. New users start with **HOST ANY**, clearly shown during creation; replace their networks explicitly when needed. Bcrypt passwords are limited to **72 UTF-8 bytes** and are never truncated. Existing external/multiple authentication configurations are displayed without authentication material and cannot be replaced through the password editor. Configuration-backed entities are read-only; unknown access stores are treated conservatively. Existing hostname/regex host restrictions, authentication, grants, defaults, profiles, policies, and quotas remain untouched by unrelated actions. Replacing networks or default roles requires an explicit selection in the editor. Inherited grants and partial revokes are shown separately; they are not flattened into an assertion of effective session permissions.
+
+Each access action is a separate server command. Earlier successful actions remain applied if a later action fails; Datahelm refreshes the actual state and never retries mutations automatically. A timeout can occur after the server applied a change. Audit entries contain action/outcome, without credentials, authentication material, or SQL bodies. Recent SELECT history is limited to 100 records from the last 24 hours and is not stored in SQLite. Non-SELECT active query text is redacted; internal and Datahelm queries are excluded from cancellation. Cancellation references expire after 30 seconds and are checked against the original query identity before use.
+
+Monitoring runs every five seconds and retains seven days of samples. ClickHouse charts show memory tracking, active queries, server query rate, and file-descriptor disk read/write throughput; these counters include monitoring work. Unavailable values and counter resets appear as gaps. Catalog counts/sizes come from metadata and can be unavailable for some engines/views. Administrative responses are bounded to 1,000 rows and 4 MiB and fail explicitly rather than silently truncating access state. Row counts and sizes are transported as decimal strings to preserve integer precision.
+
+Run the disposable ClickHouse API/TLS/SSH/restart suite, optionally with browser workflows:
+
+```powershell
+bun scripts/test-clickhouse.mjs --browser
+# Reuse a freshly built datahelm:phase1 image:
+bun scripts/test-clickhouse.mjs --skip-build --browser
+```
+
+The runner uses its own `datahelm-clickhouse-fixtures` Compose project, temporary SQLite/key volumes, test-only database credentials, and localhost ports 18082/28123. It refuses to overwrite existing fixture containers and removes only its own containers, volumes, and UUID temporary directory. Production Compose is unchanged. ClickHouse tests also run in CI alongside the MongoDB and startup/persistence suites.
 
 ## Development and checks
 

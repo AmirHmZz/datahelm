@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Activity,
@@ -11,9 +11,6 @@ import {
   ChevronRight,
   Settings2,
   LogOut,
-  Sun,
-  Moon,
-  Monitor,
   Menu,
   RefreshCw,
   Trash2,
@@ -31,7 +28,16 @@ import {
   connectionPath,
 } from "./api";
 import { Button } from "./components/ui/button";
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "./components/ui/breadcrumb";
 import { Dialog } from "./components/ui/dialog";
+import { SelectControl } from "./components/ui/select";
 import { version } from "../package.json";
 import ConnectionEditor from "./ConnectionEditor";
 import PasswordForm from "./PasswordForm";
@@ -44,6 +50,17 @@ import {
   Access,
 } from "./Views";
 
+const ClickHouseViews = lazy(() => import("./ClickHouseViews"));
+
+const engineLabel = (c?: Connection) =>
+  c?.config.engine === "clickhouse" ? "ClickHouse" : "MongoDB";
+const endpointLabel = (c: Connection) =>
+  c.config.engine === "clickhouse"
+    ? c.config.clickhouse?.endpoint
+    : c.config.mode === "uri"
+      ? "MongoDB URI"
+      : c.config.hosts;
+
 const pages = [
   ["overview", "Overview", Gauge],
   ["databases", "Databases", Database],
@@ -52,6 +69,11 @@ const pages = [
   ["queries", "Slow queries", ListFilter],
   ["topology", "Topology", Network],
 ] as const;
+const themeOptions = [
+  { value: "dark", label: "Dark" },
+  { value: "light", label: "Light" },
+  { value: "system", label: "System" },
+];
 export function Brand() {
   return (
     <div className="brand">
@@ -184,6 +206,27 @@ export default function App() {
     window.addEventListener("keydown", escape);
     return () => window.removeEventListener("keydown", escape);
   }, []);
+  async function connectionSaved(id: string) {
+    setEditor(undefined);
+    try {
+      // Fetch the post-save list before selecting: the fallback effect otherwise
+      // sees an unknown new ID in the old cache and selects the first instance.
+      await query.cancelQueries({ queryKey: ["connections"] });
+      await query.fetchQuery({
+        queryKey: ["connections"],
+        queryFn: () => api<Connection[]>("/connections"),
+        staleTime: 0,
+      });
+      setSelected(id);
+      setPage("overview");
+      void query.invalidateQueries({ queryKey: ["capabilities", id] });
+      setToast("Connection saved");
+    } catch (e) {
+      setError(
+        `Connection saved; refreshing the connection list failed: ${(e as Error).message}`,
+      );
+    }
+  }
   async function remove() {
     if (!deleteTarget) return;
     try {
@@ -286,7 +329,7 @@ export default function App() {
           }}
         >
           <Gauge size={16} />
-          <span>MongoDB instances</span>
+          <span>Database instances</span>
           <span className="ml-auto text-xs">
             {connections.data?.length || 0}
           </span>
@@ -317,9 +360,7 @@ export default function App() {
                 {c.config.name}
               </span>
               <span className="block text-[10px] mt-1 text-muted-foreground">
-                {c.config.mode === "uri"
-                  ? "MongoDB URI"
-                  : c.config.hosts?.split(",")[0]}
+                {engineLabel(c)} · {endpointLabel(c)}
               </span>
             </span>
             <span className={`status-dot ${c.status}`} aria-label={c.status} />
@@ -377,7 +418,7 @@ export default function App() {
       </aside>
       <main className="dashboard-main">
         <header className="topbar">
-          <div className="flex items-center gap-3 text-xs">
+          <div className="topbar-leading">
             <Button
               size="icon"
               variant="ghost"
@@ -389,42 +430,50 @@ export default function App() {
             >
               <Menu size={17} />
             </Button>
-            <Database size={15} className="text-muted-foreground" />
-            <span className="text-muted-foreground">Workspace</span>
-            <ChevronRight size={12} className="text-muted-foreground" />
-            <span>MongoDB</span>
-            {current && (
-              <>
-                <ChevronRight
-                  size={12}
-                  className="breadcrumb-detail text-muted-foreground"
-                />
-                <span className="breadcrumb-detail">{current.config.name}</span>
-              </>
-            )}
+            <Breadcrumb className="topbar-breadcrumb">
+              <BreadcrumbList>
+                <BreadcrumbItem>
+                  <BreadcrumbLink asChild>
+                    <button type="button" onClick={() => setPage("instances")}>
+                      Workspace
+                    </button>
+                  </BreadcrumbLink>
+                </BreadcrumbItem>
+                <BreadcrumbSeparator />
+                <BreadcrumbItem>
+                  {current ? (
+                    <BreadcrumbLink asChild>
+                      <button
+                        type="button"
+                        onClick={() => setPage("instances")}
+                      >
+                        {engineLabel(current)}
+                      </button>
+                    </BreadcrumbLink>
+                  ) : (
+                    <BreadcrumbPage>Databases</BreadcrumbPage>
+                  )}
+                </BreadcrumbItem>
+                {current && (
+                  <>
+                    <BreadcrumbSeparator />
+                    <BreadcrumbItem className="breadcrumb-current">
+                      <BreadcrumbPage title={current.config.name}>
+                        {current.config.name}
+                      </BreadcrumbPage>
+                    </BreadcrumbItem>
+                  </>
+                )}
+              </BreadcrumbList>
+            </Breadcrumb>
           </div>
-          <div className="theme-selector" role="group" aria-label="Theme">
-            {[
-              ["dark", Moon],
-              ["light", Sun],
-              ["system", Monitor],
-            ].map(([key, Icon]) => {
-              const I = Icon as typeof Moon;
-              return (
-                <Button
-                  key={key as string}
-                  size="icon"
-                  className="theme-option"
-                  variant={theme === key ? "outline" : "ghost"}
-                  onClick={() => setTheme(key as string)}
-                  aria-label={`${key} theme`}
-                  aria-pressed={theme === key}
-                  title={`${key} theme`}
-                >
-                  <I size={15} />
-                </Button>
-              );
-            })}
+          <div className="theme-selector">
+            <SelectControl
+              label="Theme"
+              value={theme}
+              onValueChange={setTheme}
+              options={themeOptions}
+            />
           </div>
         </header>
         <div className="workspace">
@@ -433,7 +482,9 @@ export default function App() {
             <>
               <div className="page-heading">
                 <div>
-                  <div className="eyebrow">MongoDB control center</div>
+                  <div className="eyebrow">
+                    {engineLabel(current)} control center
+                  </div>
                   <h1>{current.config.name}</h1>
                   <p className="flex items-center gap-2">
                     <span className={`status-dot ${current.status}`} />
@@ -446,9 +497,7 @@ export default function App() {
                           : "Awaiting first check"}
                     <span className="text-border">/</span>
                     <span className="mono text-[11px]">
-                      {current.config.mode === "uri"
-                        ? "Saved MongoDB URI"
-                        : current.config.hosts}
+                      {endpointLabel(current)}
                     </span>
                   </p>
                 </div>
@@ -484,33 +533,48 @@ export default function App() {
                     aria-current={page === key ? "page" : undefined}
                   >
                     <Icon size={14} />
-                    {label}
+                    {current.config.engine === "clickhouse" && key === "queries"
+                      ? "Query history"
+                      : label}
                   </button>
                 ))}
               </nav>
               {current.error && <ErrorBox error={current.error} />}
               <div key={current.id}>
-                {page === "overview" && (
-                  <Overview
-                    connection={current}
-                    capabilities={capabilities.data}
-                  />
-                )}{" "}
-                {page === "databases" && <Catalog id={current.id} />}{" "}
-                {page === "access" && (
-                  <Access id={current.id} notify={setToast} />
-                )}{" "}
-                {page === "operations" && (
-                  <Operations id={current.id} notify={setToast} />
-                )}{" "}
-                {page === "queries" && (
-                  <SlowQueries
-                    id={current.id}
-                    capabilities={capabilities.data}
-                    notify={setToast}
-                  />
-                )}{" "}
-                {page === "topology" && <Topology id={current.id} />}
+                {current.config.engine === "clickhouse" ? (
+                  <Suspense fallback={<Loading />}>
+                    <ClickHouseViews
+                      connection={current}
+                      page={page}
+                      capabilities={capabilities.data}
+                      notify={setToast}
+                    />
+                  </Suspense>
+                ) : (
+                  <>
+                    {page === "overview" && (
+                      <Overview
+                        connection={current}
+                        capabilities={capabilities.data}
+                      />
+                    )}{" "}
+                    {page === "databases" && <Catalog id={current.id} />}{" "}
+                    {page === "access" && (
+                      <Access id={current.id} notify={setToast} />
+                    )}{" "}
+                    {page === "operations" && (
+                      <Operations id={current.id} notify={setToast} />
+                    )}{" "}
+                    {page === "queries" && (
+                      <SlowQueries
+                        id={current.id}
+                        capabilities={capabilities.data}
+                        notify={setToast}
+                      />
+                    )}{" "}
+                    {page === "topology" && <Topology id={current.id} />}
+                  </>
+                )}
               </div>
               <footer className="content-footer">
                 <span>Metrics collected every 5 seconds · 7-day retention</span>
@@ -531,8 +595,8 @@ export default function App() {
                 A clear view of your data.
               </h1>
               <p className="text-muted-foreground mt-4 leading-7 max-w-xl">
-                Connect your MongoDB instances, follow their health, and manage
-                access from one secure workspace.
+                Connect your MongoDB and ClickHouse instances, follow their
+                health, and manage access from one secure workspace.
               </p>
               <Button className="mt-7" onClick={() => setEditor(null)}>
                 <Plus size={15} />
@@ -587,10 +651,7 @@ export default function App() {
                         <span className={`status-dot ${c.status}`} />
                       </div>
                       <p className="text-xs text-muted-foreground mt-4">
-                        {c.status} ·{" "}
-                        {c.config.mode === "uri"
-                          ? "Saved MongoDB URI"
-                          : c.config.hosts}
+                        {c.status} · {engineLabel(c)} · {endpointLabel(c)}
                       </p>
                     </button>
                   ))}
@@ -616,14 +677,7 @@ export default function App() {
         <ConnectionEditor
           connection={editor || undefined}
           onClose={() => setEditor(undefined)}
-          onSaved={(id) => {
-            setEditor(undefined);
-            setSelected(id);
-            setPage("overview");
-            void query.invalidateQueries({ queryKey: ["connections"] });
-            void query.invalidateQueries({ queryKey: ["capabilities", id] });
-            setToast("Connection saved");
-          }}
+          onSaved={(id) => void connectionSaved(id)}
         />
       )}
       <Dialog
@@ -641,7 +695,7 @@ export default function App() {
         open={!!deleteTarget}
         onOpenChange={(open) => !open && setDeleteTarget(undefined)}
         title="Remove saved connection?"
-        description={`This removes ${deleteTarget?.config.name} and its metrics history from DataHelm. The MongoDB instance is unaffected.`}
+        description={`This removes ${deleteTarget?.config.name} and its metrics history from DataHelm. The database server is unaffected.`}
       >
         <div className="form-footer">
           <Button variant="outline" onClick={() => setDeleteTarget(undefined)}>

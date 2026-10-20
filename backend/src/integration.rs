@@ -67,6 +67,7 @@ async fn mongo_administration_end_to_end() {
                 std::env::var("DATAHELM_RUNTIME_DIR")
                     .unwrap_or_else(|_| "/dev/shm/datahelm".into()),
             )),
+            clickhouse: Default::default(),
             login_attempts: Default::default(),
             secure_cookie: false,
             origin: "http://localhost:8080".into(),

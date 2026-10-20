@@ -214,6 +214,29 @@ try {
     await run("bun", ["run", "--cwd", "frontend", "e2e"]);
   }
   console.log("Disposable MongoDB 8/9 integration suite passed.");
+} catch (error) {
+  // Capture startup failures before disposable containers are removed.
+  if (started) {
+    for (const parameters of [
+      ["ps", "--all"],
+      ["logs", "--no-color", "--tail", "100"],
+    ]) {
+      try {
+        execFileSync("docker", [...compose, ...parameters], {
+          cwd: root,
+          env,
+          stdio: "inherit",
+          timeout: 15000,
+        });
+      } catch (diagnosticError) {
+        console.error(
+          "Could not collect fixture diagnostics:",
+          diagnosticError.message,
+        );
+      }
+    }
+  }
+  throw error;
 } finally {
   try {
     if (started)

@@ -67,9 +67,9 @@ test("sign in, save a connection, inspect all pages, preserve secrets, and confi
   await page.getByLabel("Password", { exact: true }).fill(password);
   await page.getByRole("button", { name: "Sign in", exact: false }).click();
   await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible();
-  await page.getByRole("button", { name: "light theme" }).click();
+  await select(page, "Theme", "Light");
   await expect(page.locator("html")).toHaveClass("light");
-  await page.getByRole("button", { name: "dark theme" }).click();
+  await select(page, "Theme", "Dark");
   await expect(page.locator("html")).not.toHaveClass("light");
   await page
     .getByRole("button", { name: "Add connection", exact: true })
@@ -163,7 +163,7 @@ test("sign in, save a connection, inspect all pages, preserve secrets, and confi
   await page.setViewportSize({ width: 390, height: 844 });
   await page.getByRole("button", { name: "Toggle navigation" }).click();
   await expect(page.locator("aside")).toHaveClass(/open/);
-  await page.getByRole("button", { name: "light theme" }).click();
+  await select(page, "Theme", "Light");
   await page.screenshot({ path: "test-results/mobile.png", fullPage: true });
   expect(errors).toEqual([]);
 });

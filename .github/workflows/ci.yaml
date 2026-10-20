@@ -17,7 +17,7 @@ jobs:
   validate:
     name: Validate
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    timeout-minutes: 90
     outputs:
       image: ${{ steps.metadata.outputs.image }}
       tags: ${{ steps.metadata.outputs.tags }}
@@ -98,6 +98,9 @@ jobs:
 
       - name: Test startup and persistence
         run: bun scripts/test-startup.mjs
+
+      - name: Test ClickHouse 26.8 administration and browser workflows
+        run: bun scripts/test-clickhouse.mjs --skip-build --browser
 
       - name: Export tested image
         if: github.event_name == 'push' && github.repository == 'AmirHmZz/datahelm'

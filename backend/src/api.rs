@@ -72,16 +72,22 @@ use utoipa::OpenApi;
         RoleMutation,
         Identity,
         ProfilerMutation,
-        KillRequest
+        KillRequest,
+        DatabaseEngine,
+        ClickHouseConfig,
+        crate::clickhouse_model::ClickHouseMetric
     )),
-    info(title = "DataHelm API", version = "0.1.0")
+    info(title = "DataHelm API", version = "0.2.1")
 )]
 struct ApiDoc;
 pub fn openapi() -> utoipa::openapi::OpenApi {
-    ApiDoc::openapi()
+    let mut api = ApiDoc::openapi();
+    api.merge(crate::clickhouse_api::openapi());
+    api
 }
 pub fn router(state: AppState) -> Router {
     let protected = Router::new()
+        .merge(crate::clickhouse_api::router())
         .route("/auth/session", get(session))
         .route("/auth/logout", post(logout))
         .route("/auth/password", post(change_password))
@@ -245,11 +251,21 @@ async fn update_connection(
     Path(id): Path<String>,
     Json(mut c): Json<ConnectionConfig>,
 ) -> ApiResult<Json<Value>> {
+    let lock = s.clickhouse.mutation_lock(&id).await;
+    let _guard = lock.lock().await;
     let old = s.store.config(&id).await?;
+    if old.engine != c.engine {
+        return Err(
+            "The engine of a saved connection cannot be changed; create another connection"
+                .to_string()
+                .into(),
+        );
+    }
     c.preserve(&old);
     c.validate()?;
     s.store.save(&id, &c).await?;
     s.provider.invalidate(&id).await;
+    s.clickhouse.invalidate(&id).await;
     s.store.audit("connection.update", &id, "ok").await;
     Ok(Json(json!({"id":id})))
 }
@@ -258,6 +274,8 @@ async fn delete_connection(
     State(s): State<AppState>,
     Path(id): Path<String>,
 ) -> ApiResult<Json<Value>> {
+    let lock = s.clickhouse.mutation_lock(&id).await;
+    let _guard = lock.lock().await;
     s.store.config(&id).await?;
     let mut tx = s
         .store
@@ -279,6 +297,7 @@ async fn delete_connection(
         .await
         .map_err(|_| "Cannot delete connection".to_string())?;
     s.provider.invalidate(&id).await;
+    s.clickhouse.invalidate(&id).await;
     s.store.audit("connection.delete", &id, "ok").await;
     Ok(Json(json!({"ok":true})))
 }
@@ -288,10 +307,20 @@ async fn test_connection(
     Json(mut input): Json<TestRequest>,
 ) -> ApiResult<Json<Value>> {
     if let Some(id) = &input.saved_id {
-        input.config.preserve(&s.store.config(id).await?);
+        let old = s.store.config(id).await?;
+        if old.engine != input.config.engine {
+            return Err("The engine of a saved connection cannot be changed"
+                .to_string()
+                .into());
+        }
+        input.config.preserve(&old);
     }
     let start = std::time::Instant::now();
-    let result = s.provider.test(&input.config).await;
+    let result = if input.config.engine == DatabaseEngine::Clickhouse {
+        s.clickhouse.test(&input.config).await
+    } else {
+        s.provider.test(&input.config).await
+    };
     if let Some(id) = &input.saved_id {
         s.store
             .status(
@@ -311,6 +340,12 @@ async fn ssh_fingerprint(Json(input): Json<TestRequest>) -> ApiResult<Json<Value
 }
 #[utoipa::path(get,path="/api/v1/connections/{id}/capabilities",responses((status=200,body=Value)))]
 async fn capabilities(State(s): State<AppState>, Path(id): Path<String>) -> ApiResult<Json<Value>> {
+    if s.store.config(&id).await?.engine == DatabaseEngine::Clickhouse {
+        return Ok(Json(
+            serde_json::to_value(s.clickhouse.capabilities(&s.store, &id).await?)
+                .map_err(|_| "Cannot encode capabilities".to_string())?,
+        ));
+    }
     Ok(Json(s.provider.capabilities(&s.store, &id).await?))
 }
 #[utoipa::path(get,path="/api/v1/connections/{id}/databases",responses((status=200,body=Value)))]
@@ -397,7 +432,7 @@ async fn metrics(
     Path(id): Path<String>,
     Query(q): Query<HistoryQuery>,
 ) -> ApiResult<Json<Vec<Metric>>> {
-    s.store.config(&id).await?;
+    let config = s.store.config(&id).await?;
     let now = chrono::Utc::now().timestamp_millis();
     let to = q.to.unwrap_or(now).min(now);
     let from = q.from.unwrap_or(to - 1800000).max(now - 604800000);
@@ -414,12 +449,22 @@ async fn metrics(
     } else {
         900000
     };
-    let rows=sqlx::query("SELECT timestamp/? AS bucket,json_extract(payload,'$.source') AS source,MIN(timestamp) AS timestamp,AVG(json_extract(payload,'$.connections')) AS connections,AVG(json_extract(payload,'$.memory_bytes')) AS memory,AVG(json_extract(payload,'$.virtual_memory_bytes')) AS virtual_memory,MAX(json_extract(payload,'$.replication_lag_seconds')) AS lag,AVG(json_extract(payload,'$.ops_per_second')) AS ops,MAX(json_extract(payload,'$.error')) AS error FROM metrics WHERE connection_id=? AND timestamp BETWEEN ? AND ? GROUP BY bucket,source ORDER BY timestamp LIMIT 2500").bind(bucket).bind(&id).bind(from).bind(to).fetch_all(&s.store.pool).await.map_err(|_|"Cannot load metrics".to_string())?;
+    let rows=sqlx::query("SELECT timestamp/? AS bucket,json_extract(payload,'$.source') AS source,MIN(timestamp) AS timestamp,AVG(json_extract(payload,'$.connections')) AS connections,AVG(json_extract(payload,'$.memory_bytes')) AS memory,AVG(json_extract(payload,'$.virtual_memory_bytes')) AS virtual_memory,MAX(json_extract(payload,'$.replication_lag_seconds')) AS lag,AVG(json_extract(payload,'$.ops_per_second')) AS ops,MAX(json_extract(payload,'$.error')) AS error,AVG(json_extract(payload,'$.clickhouse.active_queries')) AS ch_active,AVG(json_extract(payload,'$.clickhouse.queries_per_second')) AS ch_query,AVG(json_extract(payload,'$.clickhouse.read_bytes_per_second')) AS ch_read,AVG(json_extract(payload,'$.clickhouse.written_bytes_per_second')) AS ch_write FROM metrics WHERE connection_id=? AND timestamp BETWEEN ? AND ? GROUP BY bucket,source ORDER BY timestamp LIMIT 2500").bind(bucket).bind(&id).bind(from).bind(to).fetch_all(&s.store.pool).await.map_err(|_|"Cannot load metrics".to_string())?;
     let output = rows
         .into_iter()
         .map(|r| {
             let error: Option<String> = r.get("error");
             Metric {
+                clickhouse: if config.engine == DatabaseEngine::Clickhouse && error.is_none() {
+                    Some(crate::clickhouse_model::ClickHouseMetric {
+                        active_queries: r.get("ch_active"),
+                        queries_per_second: r.get("ch_query"),
+                        read_bytes_per_second: r.get("ch_read"),
+                        written_bytes_per_second: r.get("ch_write"),
+                    })
+                } else {
+                    None
+                },
                 timestamp: r.get("timestamp"),
                 source: r.get("source"),
                 connections: if error.is_none() {
@@ -749,6 +794,7 @@ mod tests {
         AppState {
             store,
             provider: Arc::new(MongoProvider::new("unused".into())),
+            clickhouse: Default::default(),
             login_attempts: Default::default(),
             secure_cookie: false,
             origin: "http://localhost:8080".into(),
@@ -844,6 +890,7 @@ mod tests {
             s.metric(
                 "a",
                 &Metric {
+                    clickhouse: None,
                     timestamp,
                     source: "node".into(),
                     connections: None,

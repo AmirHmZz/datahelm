@@ -3,6 +3,9 @@ mod auth;
 #[cfg(test)]
 mod auth_tests;
 mod bootstrap;
+mod clickhouse;
+mod clickhouse_api;
+mod clickhouse_model;
 mod crypto;
 #[cfg(test)]
 mod integration;
@@ -19,6 +22,7 @@ use tokio::sync::Mutex;
 pub struct AppState {
     pub store: Store,
     pub provider: Arc<MongoProvider>,
+    pub clickhouse: Arc<clickhouse::ClickHouseProvider>,
     pub login_attempts: Arc<Mutex<HashMap<String, (std::time::Instant, u32)>>>,
     pub secure_cookie: bool,
     pub origin: String,
@@ -63,6 +67,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let state = AppState {
         store,
         provider,
+        clickhouse: Default::default(),
         login_attempts: Default::default(),
         secure_cookie: origin.starts_with("https://"),
         origin,
